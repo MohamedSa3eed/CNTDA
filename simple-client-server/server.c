@@ -5,26 +5,31 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 
 #define IP "localhost" // the IP address users will be connecting to
-#define PORT "9000" // the port users will be connecting to
+#define PORT "90001" // the port users will be connecting to
 #define BACKLOG 10 // how many pending connections queue will hold
 
 int main(int argc, char *argv[]) {
   // string store data to send to client 
+  char hostname[255];
   char serMsg[255] = "Message from the server to the "
                      "client \'Hello Client\' "; 
   struct sockaddr_storage their_addr;
   socklen_t addr_size;
   struct addrinfo hints, *servinfo;
-  int sockfd;
+  int sockfd, value;
+
+  printf("enter number between 1 and 100: ");
+  scanf("%d", &value);
 
   // first, load up address structs with getaddrinfo():
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC; // use IPv4 or IPv6, whichever
   hints.ai_socktype = SOCK_STREAM; // TCP
   hints.ai_flags = AI_PASSIVE; // fill in my IP for me (replace IP with NULL)
-  int info = getaddrinfo(IP, PORT, &hints, &servinfo);
+  int info = getaddrinfo(NULL, PORT, &hints, &servinfo);
   if (info != 0) {
     fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(info));
     exit(EXIT_FAILURE);
@@ -43,6 +48,14 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  // get the host name
+  int res =  gethostname(hostname, sizeof(hostname));
+  if (res == -1) {
+    perror("gethostname");
+    exit(EXIT_FAILURE);
+  }
+  printf("server: host name is %s\n", hostname);
+
   printf("server: waiting for connections...\n");
   int connection = listen(sockfd, BACKLOG);
   if (connection == -1) {
@@ -58,19 +71,17 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
   else {
-    printf("server: accepted connection\n");
-    // send message to client 
-    // it returns the number of bytes sent 
-    // or -1 if an error occurred
-    // if the whole message is not sent its up to you to resend the rest
-    int sent_bytes = send(client_fd, serMsg, sizeof(serMsg), 0);
-    if (sent_bytes == -1) {
-      perror("send");
-      exit(EXIT_FAILURE);
+    // get the client address
+    struct sockaddr_in peeraddr;
+    socklen_t peeraddr_len = sizeof(peeraddr);
+    if(getpeername(client_fd, (struct sockaddr*)&peeraddr, &peeraddr_len) != -1){
+      char peername[INET_ADDRSTRLEN];
+      int peerport;
+      inet_ntop(AF_INET, (struct sockaddr*)&peeraddr, peername, sizeof(peername));
+      peerport = ntohs(peeraddr.sin_port);
+      printf("server: got connection from %s:%d\n", peername, peerport);
     }
-    else {
-      printf("server: sent message to client\n");
-    }
+
     printf("server: receiving message from client...\n");
     char buf[255];
     int recvMsg = recv(client_fd, buf, sizeof(buf), 0);
@@ -80,9 +91,42 @@ int main(int argc, char *argv[]) {
     }
     else {
       printf("server: received message from client\n");
-      printf("Server: %s\n", buf);
+      int num = atoi(buf);
+      printf("Server: received %d\n", num);
+      if (num > 100 && num < 1){
+        printf("server: out of range\n");
+        close(client_fd);
+        close(sockfd);
+        exit(EXIT_FAILURE);
+      }
+    }
+    // Calculate the length needed for the string representation
+    int length = snprintf(NULL, 0, "%d", value) + 1;
+    // Allocate memory for the string
+    char stringValue[length];
+    // Use snprintf to convert the integer to a string
+    snprintf(stringValue, length, "%d", value);
+
+    // send message to client 
+    // it returns the number of bytes sent 
+    // or -1 if an error occurred
+    // if the whole message is not sent its up to you to resend the rest
+    int sent_bytes = send(client_fd, stringValue, sizeof(stringValue), 0);
+    if (sent_bytes == -1) {
+      perror("send");
+      exit(EXIT_FAILURE);
+    }
+    sent_bytes = send(client_fd, hostname, sizeof(hostname), 0);
+    if (sent_bytes == -1) {
+      perror("send");
+      exit(EXIT_FAILURE);
+    }
+    else {
+      printf("server: sent message to client\n");
     }
   }
   freeaddrinfo(servinfo); // free the linked-list
+  close(client_fd);
+  close(sockfd);
   return EXIT_SUCCESS;
 }

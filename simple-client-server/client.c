@@ -6,12 +6,16 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-#define IP "localhost" // the IP address client will be connecting to
-#define PORT "9000" // the port client will be connecting to
+#define IP "192.168.1.13" // the IP address client will be connecting to
+#define PORT "90001" // the port client will be connecting to
 
 int main(int argc, char *argv[]) {
   struct addrinfo hints, *servinfo;
-  int sockfd;
+  int sockfd, value, recived_value;
+  char hostname[255];
+
+  printf("enter number between 1 and 100: ");
+  scanf("%d", &value);
   // first, load up address structs with getaddrinfo():
   memset(&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC; // use IPv4 or IPv6, whichever
@@ -35,19 +39,14 @@ int main(int argc, char *argv[]) {
   }
   else {
     printf("client: connected\n");
-    char buf[255];
-    printf("client: receiving message from server...\n");
-    int recvMsg = recv(sockfd, buf, sizeof(buf), 0);
-    if (recvMsg == -1) {
-      perror("recv");
-      exit(EXIT_FAILURE);
-    }
-    else {
-      printf("client: received message from server\n");
-      printf("Client: %s\n", buf);
-    }
     printf("client: sending message to server...\n");
-    int sent_bytes = send(sockfd, "Hello Server", 12, 0);
+    // Calculate the length needed for the string representation
+    int length = snprintf(NULL, 0, "%d", value) + 1;
+    // Allocate memory for the string
+    char stringValue[length];
+    // Use snprintf to convert the integer to a string
+    snprintf(stringValue, length, "%d", value);
+    int sent_bytes = send(sockfd, stringValue, 12, 0);
     if (sent_bytes == -1) {
       perror("send");
       exit(EXIT_FAILURE);
@@ -55,7 +54,32 @@ int main(int argc, char *argv[]) {
     else {
       printf("client: sent message to server\n");
     }
+    printf("client: receiving message from server...\n");
+    char buf[255];
+    int recvMsg = recv(sockfd, buf, sizeof(buf), 0);
+    if (recvMsg == -1) {
+      perror("recv");
+      exit(EXIT_FAILURE);
+    }
+    recived_value = atoi(buf);
+    recvMsg = recv(sockfd, buf, sizeof(buf), 0);
+    if (recvMsg == -1) {
+      perror("recv");
+      exit(EXIT_FAILURE);
+    }
+    // get the host name
+    int res =  gethostname(hostname, sizeof(hostname));
+    if (res == -1) {
+      perror("gethostname");
+      exit(EXIT_FAILURE);
+    }
+    printf("client: the host name is: %s\n", hostname);
+    printf("client: the value is: %d\n", value);
+    printf("client: the server name is: %s\n", buf);
+    printf("client: the server value is: %d\n", recived_value);
+    printf("client: the sum of the two values is: %d\n", value + recived_value);
   }
   freeaddrinfo(servinfo); // free the linked-list
+  close(sockfd);
   return EXIT_SUCCESS;
 }
