@@ -56,77 +56,80 @@ int main(int argc, char *argv[]) {
   }
   printf("server: host name is %s\n", hostname);
 
-  printf("server: waiting for connections...\n");
-  int connection = listen(sockfd, BACKLOG);
-  if (connection == -1) {
-    perror("listen");
-    exit(EXIT_FAILURE);
-  }
-
-  printf ("server: accepting connection...\n");
-  addr_size = sizeof(their_addr);
-  int client_fd = accept(sockfd, (struct sockaddr *)&their_addr, &addr_size);
-  if (client_fd == -1) {
-    perror("accept");
-    exit(EXIT_FAILURE);
-  }
-  else {
-    // get the client address
-    struct sockaddr_in peeraddr;
-    socklen_t peeraddr_len = sizeof(peeraddr);
-    if(getpeername(client_fd, (struct sockaddr*)&peeraddr, &peeraddr_len) != -1){
-      char peername[INET_ADDRSTRLEN];
-      int peerport;
-      inet_ntop(AF_INET, (struct sockaddr*)&peeraddr, peername, sizeof(peername));
-      peerport = ntohs(peeraddr.sin_port);
-      printf("server: got connection from %s:%d\n", peername, peerport);
+  while (1){
+    printf("server: waiting for connections...\n");
+    int connection = listen(sockfd, BACKLOG);
+    if (connection == -1) {
+      perror("listen");
+      exit(EXIT_FAILURE);
     }
 
-    printf("server: receiving message from client...\n");
-    char buf[255];
-    int recvMsg = recv(client_fd, buf, sizeof(buf), 0);
-    if (recvMsg == -1) {
-      perror("recv");
+    printf ("server: accepting connection...\n");
+    addr_size = sizeof(their_addr);
+    int client_fd = accept(sockfd, (struct sockaddr *)&their_addr, &addr_size);
+    if (client_fd == -1) {
+      perror("accept");
       exit(EXIT_FAILURE);
     }
     else {
-      printf("server: received message from client\n");
-      int num = atoi(buf);
-      printf("Server: received %d\n", num);
-      if (num > 100 && num < 1){
-        printf("server: out of range\n");
-        close(client_fd);
-        close(sockfd);
+      // get the client address
+      struct sockaddr_in peeraddr;
+      socklen_t peeraddr_len = sizeof(peeraddr);
+      if(getpeername(client_fd, (struct sockaddr*)&peeraddr, &peeraddr_len) != -1){
+        char peername[INET_ADDRSTRLEN];
+        int peerport;
+        inet_ntop(AF_INET, (struct sockaddr*)&peeraddr, peername, sizeof(peername));
+        peerport = ntohs(peeraddr.sin_port);
+        printf("server: got connection from %s:%d\n", peername, peerport);
+      }
+
+      printf("server: receiving message from client...\n");
+      char buf[255];
+      int recvMsg = recv(client_fd, buf, sizeof(buf), 0);
+      if (recvMsg == -1) {
+        perror("recv");
         exit(EXIT_FAILURE);
       }
-    }
-    // Calculate the length needed for the string representation
-    int length = snprintf(NULL, 0, "%d", value) + 1;
-    // Allocate memory for the string
-    char stringValue[length];
-    // Use snprintf to convert the integer to a string
-    snprintf(stringValue, length, "%d", value);
+      else {
+        printf("server: received message from client\n");
+        int num = atoi(buf);
+        printf("Server: received %d\n", num);
+        if (num > 100 || num < 1){
+          printf("server: out of range\n");
+          freeaddrinfo(servinfo); // free the linked-list
+          close(client_fd);
+          close(sockfd);
+          exit(EXIT_FAILURE);
+        }
+      }
+      // Calculate the length needed for the string representation
+      int length = snprintf(NULL, 0, "%d", value) + 1;
+      // Allocate memory for the string
+      char stringValue[length];
+      // Use snprintf to convert the integer to a string
+      snprintf(stringValue, length, "%d", value);
 
-    // send message to client 
-    // it returns the number of bytes sent 
-    // or -1 if an error occurred
-    // if the whole message is not sent its up to you to resend the rest
-    int sent_bytes = send(client_fd, stringValue, sizeof(stringValue), 0);
-    if (sent_bytes == -1) {
-      perror("send");
-      exit(EXIT_FAILURE);
+      // send message to client 
+      // it returns the number of bytes sent 
+      // or -1 if an error occurred
+      // if the whole message is not sent its up to you to resend the rest
+      int sent_bytes = send(client_fd, stringValue, sizeof(stringValue), 0);
+      if (sent_bytes == -1) {
+        perror("send");
+        exit(EXIT_FAILURE);
+      }
+      sent_bytes = send(client_fd, hostname, sizeof(hostname), 0);
+      if (sent_bytes == -1) {
+        perror("send");
+        exit(EXIT_FAILURE);
+      }
+      else {
+        printf("server: sent message to client\n");
+      }
     }
-    sent_bytes = send(client_fd, hostname, sizeof(hostname), 0);
-    if (sent_bytes == -1) {
-      perror("send");
-      exit(EXIT_FAILURE);
-    }
-    else {
-      printf("server: sent message to client\n");
-    }
+    close(client_fd);
   }
   freeaddrinfo(servinfo); // free the linked-list
-  close(client_fd);
   close(sockfd);
   return EXIT_SUCCESS;
 }

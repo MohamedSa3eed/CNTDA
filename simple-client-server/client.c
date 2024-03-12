@@ -6,13 +6,19 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-#define IP "192.168.1.13" // the IP address client will be connecting to
 #define PORT "90001" // the port client will be connecting to
 
 int main(int argc, char *argv[]) {
   struct addrinfo hints, *servinfo;
   int sockfd, value, recived_value;
   char hostname[255];
+
+  if (argc != 2) {
+    fprintf(stderr, "usage: client server_ip \n");
+    exit(EXIT_FAILURE);
+  }
+  char *IP = argv[1];
+  
 
   printf("enter number between 1 and 100: ");
   scanf("%d", &value);
