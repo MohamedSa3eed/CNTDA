@@ -1,6 +1,29 @@
 #import socket module
 from socket import *
+from threading import Thread
 import sys # In order to terminate the program
+
+def request_handle(connectionSocket):
+    try:
+        # receive the message from the client
+        message = connectionSocket.recv(1024)
+        print("message:",message)
+        # open the file and read the content (first line)
+        filename = message.split()[1]
+        f = open(filename[1:])
+        outputdata = f.read()
+        #Send one HTTP header line into socket
+        connectionSocket.send("HTTP/1.1 200 OK\r\n\r\n".encode())
+        #Send the content of the requested file to the client
+        connectionSocket.sendall(outputdata.encode())
+        # close the file
+        f.close()
+        connectionSocket.close()
+    except IOError:
+        #Send response message for file not found
+        connectionSocket.send("HTTP/1.1 404 Not Found\r\n\r\n".encode())
+        #Close client socket
+        connectionSocket.close()
 
 serverHostName = gethostname()
 print("Server: host name is",serverHostName)
@@ -16,28 +39,8 @@ while True:
     #Establish the connection
     print('Ready to serve...')
     connectionSocket, addr = serverSocket.accept()
-    try:
-        # receive the message from the client
-        message = connectionSocket.recv(1024)
-        print("message:",message)
-        # open the file and read the content (first line)
-        filename = message.split()[1]
-        f = open(filename[1:])
-        outputdata = f.read()
-        #Send one HTTP header line into socket
-        connectionSocket.send("HTTP/1.1 200 OK\r\n\r\n".encode())
-        connectionSocket.sendall(outputdata.encode())
-        f.close()
-        #Send the content of the requested file to the client
-        # for i in range(0, len(outputdata)):
-            # connectionSocket.send(outputdata[i].encode())
-            # connectionSocket.send("\r\n".encode())
+    thread = Thread(target=request_handle, args=(connectionSocket,))
+    thread.start()
 
-        connectionSocket.close()
-    except IOError:
-        #Send response message for file not found
-        connectionSocket.send("HTTP/1.1 404 Not Found\r\n\r\n".encode())
-        #Close client socket
-        connectionSocket.close()
 serverSocket.close()
 sys.exit()#Terminate the program after sending the corresponding data
