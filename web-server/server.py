@@ -22,6 +22,9 @@ def request_handle(connectionSocket):
     except IOError:
         #Send response message for file not found
         connectionSocket.send("HTTP/1.1 404 Not Found\r\n\r\n".encode())
+        f = open("notFound.html")
+        outputdata = f.read()
+        connectionSocket.sendall(outputdata.encode())
         #Close client socket
         connectionSocket.close()
 
@@ -39,8 +42,12 @@ while True:
     #Establish the connection
     print('Ready to serve...')
     connectionSocket, addr = serverSocket.accept()
-    thread = Thread(target=request_handle, args=(connectionSocket,))
-    thread.start()
+    try:
+        thread = Thread(target=request_handle, args=(connectionSocket,))
+        thread.start()
+    except KeyboardInterrupt:
+        serverSocket.close()
+        sys.exit()
 
 serverSocket.close()
 sys.exit()#Terminate the program after sending the corresponding data
